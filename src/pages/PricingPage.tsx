@@ -1,128 +1,153 @@
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { Navbar } from '@/components/layout/Navbar';
+import { Footer } from '@/components/layout/Footer';
+import { PricingCard, PricingPlan } from '@/components/pricing/PricingCard';
+import { api } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
-const PLANS = [
+const plans: PricingPlan[] = [
   {
-    name: 'Free',
-    description: 'Try it out',
-    minutes: '3 min',
+    id: 'free',
+    name: 'Free Trial',
     price: 'Free',
-    features: ['1 video', 'Max 3 minutes', 'Standard quality'],
-    telegramParam: 'free',
-    featured: false,
+    description: 'Try SmartDub with one free video',
+    videoLimit: 1,
+    maxDuration: '3 minutes',
+    features: [
+      'One-time use',
+      'All 50+ languages',
+      'Standard processing',
+      'Download in HD',
+    ],
   },
   {
-    name: 'Basic',
-    description: 'For casual users',
-    minutes: '10 min',
-    price: '$4.99',
-    features: ['10 videos', 'Up to 10 min each', 'HD quality'],
-    telegramParam: 'basic',
-    featured: false,
+    id: 'starter',
+    name: 'Starter',
+    price: '$19',
+    period: '/one-time',
+    description: 'Perfect for small projects',
+    videoLimit: 10,
+    maxDuration: '10 minutes',
+    features: [
+      '10 video credits',
+      'All 50+ languages',
+      'Priority processing',
+      'Download in HD',
+      'Email support',
+    ],
+    badge: 'Popular',
   },
   {
+    id: 'pro',
     name: 'Pro',
-    description: 'Most popular',
-    minutes: '60 min',
-    price: '$14.99',
-    features: ['50 videos', 'Up to 1 hour each', 'HD quality', 'Priority processing'],
-    telegramParam: 'pro',
+    price: '$79',
+    period: '/one-time',
+    description: 'For content creators & businesses',
+    videoLimit: 50,
+    maxDuration: '60 minutes',
     featured: true,
+    features: [
+      '50 video credits',
+      'All 50+ languages',
+      'Fastest processing',
+      'Download in 4K',
+      'Priority support',
+      'Custom voice selection',
+    ],
+    badge: 'Best Value',
   },
   {
+    id: 'advanced',
     name: 'Advanced',
-    description: 'For power users',
-    minutes: 'Unlimited',
-    price: '$39.99',
-    features: ['Unlimited videos', 'Any duration', '4K quality', 'Priority processing', 'Custom voices'],
-    telegramParam: 'advanced',
-    featured: false,
+    price: '$199',
+    period: '/one-time',
+    description: 'For agencies & power users',
+    videoLimit: 200,
+    maxDuration: '120 minutes',
+    features: [
+      '200 video credits',
+      'All 50+ languages',
+      'Fastest processing',
+      'Download in 4K',
+      'Dedicated support',
+      'Custom voice cloning',
+      'API access',
+    ],
   },
 ];
 
-export default function PricingPage() {
-  const navigate = useNavigate();
+const PricingPage = () => {
+  const { toast } = useToast();
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
-  const handleBuy = (telegramParam: string) => {
-    // Open Telegram deep link for payment
-    const botUsername = 'SmartDubBot'; // Replace with actual bot username
-    window.open(`https://t.me/${botUsername}?start=buy_${telegramParam}`, '_blank');
+  const handleSelectPlan = async (planId: string) => {
+    if (planId === 'free') {
+      toast({
+        title: 'Free Trial',
+        description: 'Sign up to get your free video credit!',
+      });
+      return;
+    }
+
+    setLoadingPlan(planId);
+    
+    try {
+      const { payment_url } = await api.createPayment(planId);
+      window.location.href = payment_url;
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to start payment. Please try again.',
+      });
+    } finally {
+      setLoadingPlan(null);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="px-4 py-4 flex items-center gap-3 border-b border-border">
-        <button
-          onClick={() => navigate('/')}
-          className="w-10 h-10 flex items-center justify-center rounded-xl bg-card active:scale-95 transition-transform"
-        >
-          <ArrowLeft className="w-5 h-5 text-foreground" />
-        </button>
-        <h1 className="text-lg font-semibold text-foreground">Pricing</h1>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 px-4 py-6 space-y-4 overflow-y-auto">
-        {PLANS.map((plan) => (
-          <div
-            key={plan.name}
-            className={`
-              relative rounded-2xl p-5 space-y-4 transition-all
-              ${plan.featured 
-                ? 'bg-card border-2 border-primary' 
-                : 'bg-card border border-border'
-              }
-            `}
-          >
-            {/* Featured Badge */}
-            {plan.featured && (
-              <div className="absolute -top-3 left-4 px-3 py-1 bg-primary text-primary-foreground text-xs font-semibold rounded-full flex items-center gap-1">
-                <Sparkles className="w-3 h-3" />
-                Most Popular
-              </div>
-            )}
-
-            {/* Plan Header */}
-            <div className="flex items-start justify-between pt-1">
-              <div>
-                <h3 className="text-foreground font-semibold text-lg">{plan.name}</h3>
-                <p className="text-muted-foreground text-sm">{plan.description}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-foreground font-bold text-xl">{plan.price}</p>
-                {plan.price !== 'Free' && (
-                  <p className="text-muted-foreground text-xs">one-time</p>
-                )}
-              </div>
-            </div>
-
-            {/* Features */}
-            <div className="space-y-2">
-              {plan.features.map((feature, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-primary flex-shrink-0" />
-                  <span className="text-muted-foreground text-sm">{feature}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Buy Button */}
-            <button
-              onClick={() => handleBuy(plan.telegramParam)}
-              className={`
-                w-full h-12 font-semibold rounded-xl flex items-center justify-center transition-all active:scale-[0.98]
-                ${plan.featured
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-foreground hover:bg-muted/80'
-                }
-              `}
-            >
-              {plan.price === 'Free' ? 'Start Free' : 'Buy via Telegram'}
-            </button>
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      
+      <main className="pt-24 pb-16 px-4">
+        <div className="container mx-auto max-w-6xl">
+          {/* Header */}
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <h1 className="font-display text-4xl sm:text-5xl font-bold mb-4">
+              Simple, Transparent{' '}
+              <span className="text-gradient">Pricing</span>
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Choose the plan that works for you. All plans include full access to our AI dubbing technology.
+            </p>
           </div>
-        ))}
+
+          {/* Pricing Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-4">
+            {plans.map((plan) => (
+              <PricingCard
+                key={plan.id}
+                plan={plan}
+                onSelect={handleSelectPlan}
+                isLoading={loadingPlan === plan.id}
+              />
+            ))}
+          </div>
+
+          {/* FAQ/Trust */}
+          <div className="mt-16 text-center">
+            <p className="text-muted-foreground">
+              All payments are secure and processed via our payment partner.
+              <br />
+              Questions? <a href="/contact" className="text-primary hover:underline">Contact us</a>
+            </p>
+          </div>
+        </div>
       </main>
+
+      <Footer />
     </div>
   );
-}
+};
+
+export default PricingPage;

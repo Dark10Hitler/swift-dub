@@ -1,58 +1,36 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
-import { AuthForm } from '@/components/auth/AuthForm';
-import { api } from '@/lib/api';
+import { TelegramAuth } from '@/components/auth/TelegramAuth';
 import { useToast } from '@/hooks/use-toast';
+import { api } from '@/lib/api';
 import { Zap } from 'lucide-react';
 
 const AuthPage = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [mode, setMode] = useState<'login' | 'register'>(
-    searchParams.get('mode') === 'register' ? 'register' : 'login'
-  );
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | undefined>();
 
+  // Redirect if already authenticated
   useEffect(() => {
-    const modeParam = searchParams.get('mode');
-    if (modeParam === 'register' || modeParam === 'login') {
-      setMode(modeParam);
-    }
-  }, [searchParams]);
-
-  const handleSubmit = async (email: string, password: string) => {
-    setIsLoading(true);
-    setError(undefined);
-
-    try {
-      if (mode === 'login') {
-        await api.login(email, password);
-        toast({
-          title: 'Welcome back!',
-          description: 'You have successfully signed in.',
-        });
-      } else {
-        await api.register(email, password);
-        toast({
-          title: 'Account created!',
-          description: 'Welcome to SmartDub. You have 1 free video to try.',
-        });
-      }
+    if (api.isAuthenticated()) {
       navigate('/dashboard');
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Something went wrong';
-      setError(message);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: message,
-      });
-    } finally {
-      setIsLoading(false);
     }
+  }, [navigate]);
+
+  const handleSuccess = () => {
+    toast({
+      title: 'Welcome to SmartDub!',
+      description: 'You have been successfully authenticated via Telegram.',
+    });
+    navigate('/dashboard');
+  };
+
+  const handleError = (error: string) => {
+    toast({
+      variant: 'destructive',
+      title: 'Authentication Failed',
+      description: error,
+    });
   };
 
   return (
@@ -73,12 +51,9 @@ const AuthPage = () => {
             </h1>
           </div>
 
-          <AuthForm
-            mode={mode}
-            onSubmit={handleSubmit}
-            onModeChange={setMode}
-            isLoading={isLoading}
-            error={error}
+          <TelegramAuth 
+            onSuccess={handleSuccess} 
+            onError={handleError} 
           />
         </div>
       </main>

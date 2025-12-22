@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Menu, X, Zap } from 'lucide-react';
+import { Menu, X, Zap, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTelegram } from '@/hooks/useTelegram';
+import { api } from '@/lib/api';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -13,6 +15,10 @@ const navLinks = [
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const { isAvailable, firstName, username } = useTelegram();
+  const isAuthenticated = api.isAuthenticated();
+
+  const displayName = firstName || username || 'User';
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass">
@@ -46,18 +52,26 @@ export function Navbar() {
             ))}
           </div>
 
-          {/* Desktop CTA */}
+          {/* Desktop User Status */}
           <div className="hidden md:flex items-center gap-4">
-            <Link to="/auth">
-              <Button variant="ghost" size="sm">
-                Sign In
-              </Button>
-            </Link>
-            <Link to="/auth?mode=register">
-              <Button variant="default" size="sm">
-                Get Started
-              </Button>
-            </Link>
+            {isAuthenticated && isAvailable ? (
+              <Link to="/settings">
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <User className="w-4 h-4" />
+                  {displayName}
+                </Button>
+              </Link>
+            ) : isAvailable ? (
+              <Link to="/auth">
+                <Button variant="default" size="sm">
+                  Connect
+                </Button>
+              </Link>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                Open in Telegram
+              </span>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -89,16 +103,24 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t border-border">
-                <Link to="/auth" onClick={() => setIsOpen(false)}>
-                  <Button variant="ghost" className="w-full">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link to="/auth?mode=register" onClick={() => setIsOpen(false)}>
-                  <Button variant="default" className="w-full">
-                    Get Started
-                  </Button>
-                </Link>
+                {isAuthenticated && isAvailable ? (
+                  <Link to="/settings" onClick={() => setIsOpen(false)}>
+                    <Button variant="ghost" className="w-full gap-2">
+                      <User className="w-4 h-4" />
+                      {displayName}
+                    </Button>
+                  </Link>
+                ) : isAvailable ? (
+                  <Link to="/auth" onClick={() => setIsOpen(false)}>
+                    <Button variant="default" className="w-full">
+                      Connect
+                    </Button>
+                  </Link>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    Please open this app from Telegram
+                  </p>
+                )}
               </div>
             </div>
           </div>

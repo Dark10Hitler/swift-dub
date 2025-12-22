@@ -1,23 +1,26 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { VideoHistoryTable } from '@/components/dashboard/VideoHistoryTable';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { api, UserLimits, VideoTask } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTelegram } from '@/hooks/useTelegram';
+import { useAuth } from '@/contexts/AuthContext';
 import { Upload, CreditCard, Video, Zap, Gift, AlertTriangle } from 'lucide-react';
 
 const Dashboard = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAvailable, userId, firstName } = useTelegram();
+  const { isAvailable, userId } = useTelegram();
+  const { user } = useAuth();
   
   const [limits, setLimits] = useState<UserLimits | null>(null);
   const [videos, setVideos] = useState<VideoTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const displayName = user?.first_name || 'there';
 
   useEffect(() => {
     const fetchData = async () => {
@@ -43,7 +46,6 @@ const Dashboard = () => {
   }, [toast]);
 
   const hasCredits = limits && (limits.video_limit > 0 || !limits.free_used);
-  const displayName = firstName || 'there';
 
   return (
     <div className="min-h-screen bg-background">
@@ -61,7 +63,7 @@ const Dashboard = () => {
             </p>
           </div>
 
-          {/* Telegram Warning */}
+          {/* Telegram Info */}
           {isAvailable && userId && (
             <Card variant="glass" className="mb-6 border-secondary/50">
               <CardContent className="p-4 flex items-center gap-3">

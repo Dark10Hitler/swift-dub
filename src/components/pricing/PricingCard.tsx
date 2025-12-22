@@ -20,10 +20,11 @@ interface PricingCardProps {
   plan: PricingPlan;
   onSelect: (planId: string) => void;
   isLoading?: boolean;
+  isDisabled?: boolean;
   currentPlan?: boolean;
 }
 
-export function PricingCard({ plan, onSelect, isLoading, currentPlan }: PricingCardProps) {
+export function PricingCard({ plan, onSelect, isLoading, isDisabled, currentPlan }: PricingCardProps) {
   return (
     <Card 
       variant={plan.featured ? 'pricingFeatured' : 'pricing'}
@@ -125,7 +126,7 @@ export function PricingCard({ plan, onSelect, isLoading, currentPlan }: PricingC
       <CardFooter className="pt-4">
         <Button
           onClick={() => onSelect(plan.id)}
-          disabled={isLoading || currentPlan}
+          disabled={isLoading || isDisabled || currentPlan}
           className="w-full"
           variant={plan.featured ? 'glass' : 'hero'}
           size="lg"

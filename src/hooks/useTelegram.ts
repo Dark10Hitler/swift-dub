@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 
 interface TelegramUser {
   id: number;
@@ -34,6 +34,8 @@ interface TelegramWebApp {
   isExpanded: boolean;
   viewportHeight: number;
   viewportStableHeight: number;
+  platform: string;
+  version: string;
   MainButton: {
     text: string;
     color: string;
@@ -73,72 +75,146 @@ declare global {
   }
 }
 
+export interface TelegramPlatformInfo {
+  isMobile: boolean;
+  isDesktop: boolean;
+  isIOS: boolean;
+  isAndroid: boolean;
+  platform: string;
+}
+
 export function useTelegram() {
   const [isAvailable, setIsAvailable] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [tg, setTg] = useState<TelegramWebApp | null>(null);
+  const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkTelegram = () => {
-      if (window.Telegram?.WebApp) {
-        const webApp = window.Telegram.WebApp;
-        webApp.ready();
-        webApp.expand();
-        setTg(webApp);
-        setIsAvailable(true);
-      } else {
+    const initTelegram = () => {
+      try {
+        if (window.Telegram?.WebApp) {
+          const webApp = window.Telegram.WebApp;
+          
+          // Safely call ready and expand
+          try {
+            webApp.ready();
+          } catch (e) {
+            console.warn('Failed to call tg.ready():', e);
+          }
+          
+          try {
+            webApp.expand();
+          } catch (e) {
+            console.warn('Failed to call tg.expand():', e);
+          }
+          
+          setTg(webApp);
+          setIsAvailable(true);
+          setInitError(null);
+        } else {
+          setIsAvailable(false);
+          setInitError('Telegram WebApp not available');
+        }
+      } catch (e) {
+        console.error('Telegram init error:', e);
         setIsAvailable(false);
+        setInitError(e instanceof Error ? e.message : 'Unknown error');
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
-    // Check immediately
+    // Check if document is already loaded
     if (document.readyState === 'complete') {
-      checkTelegram();
+      // Small delay to ensure Telegram SDK is injected
+      const timeout = setTimeout(initTelegram, 50);
+      return () => clearTimeout(timeout);
     } else {
-      window.addEventListener('load', checkTelegram);
-      return () => window.removeEventListener('load', checkTelegram);
+      // Wait for window load
+      const handleLoad = () => {
+        setTimeout(initTelegram, 50);
+      };
+      window.addEventListener('load', handleLoad);
+      return () => window.removeEventListener('load', handleLoad);
     }
-
-    // Also check after a short delay for dynamic loading
-    const timeout = setTimeout(checkTelegram, 100);
-    return () => clearTimeout(timeout);
   }, []);
 
-  const userId = tg?.initDataUnsafe?.user?.id || null;
-  const username = tg?.initDataUnsafe?.user?.username || null;
-  const firstName = tg?.initDataUnsafe?.user?.first_name || null;
-  const lastName = tg?.initDataUnsafe?.user?.last_name || null;
+  // Extract user data safely
+  const userId = tg?.initDataUnsafe?.user?.id ?? null;
+  const username = tg?.initDataUnsafe?.user?.username ?? null;
+  const firstName = tg?.initDataUnsafe?.user?.first_name ?? null;
+  const lastName = tg?.initDataUnsafe?.user?.last_name ?? null;
   const initData = tg?.initData || null;
-  const colorScheme = tg?.colorScheme || 'dark';
+  const colorScheme = tg?.colorScheme ?? 'dark';
+
+  // Check if initData is valid (has actual content)
+  const hasValidInitData = Boolean(initData && initData.length > 0);
+
+  // Platform detection
+  const platformInfo: TelegramPlatformInfo = useMemo(() => {
+    const platform = tg?.platform?.toLowerCase() || '';
+    return {
+      isMobile: platform.includes('android') || platform.includes('ios'),
+      isDesktop: platform.includes('tdesktop') || platform.includes('macos') || platform.includes('web'),
+      isIOS: platform.includes('ios'),
+      isAndroid: platform.includes('android'),
+      platform: tg?.platform || 'unknown',
+    };
+  }, [tg?.platform]);
 
   const sendData = useCallback((data: object) => {
     if (tg) {
-      tg.sendData(JSON.stringify(data));
+      try {
+        tg.sendData(JSON.stringify(data));
+      } catch (e) {
+        console.error('Failed to send data to Telegram:', e);
+      }
     }
   }, [tg]);
 
   const hapticFeedback = useCallback((type: 'success' | 'error' | 'warning' | 'light' | 'medium' | 'heavy') => {
     if (tg?.HapticFeedback) {
-      if (type === 'success' || type === 'error' || type === 'warning') {
-        tg.HapticFeedback.notificationOccurred(type);
-      } else {
-        tg.HapticFeedback.impactOccurred(type);
+      try {
+        if (type === 'success' || type === 'error' || type === 'warning') {
+          tg.HapticFeedback.notificationOccurred(type);
+        } else {
+          tg.HapticFeedback.impactOccurred(type);
+        }
+      } catch (e) {
+        console.warn('Haptic feedback failed:', e);
       }
     }
   }, [tg]);
 
   const showMainButton = useCallback((text: string, onClick: () => void) => {
     if (tg?.MainButton) {
-      tg.MainButton.setText(text);
-      tg.MainButton.onClick(onClick);
-      tg.MainButton.show();
+      try {
+        tg.MainButton.setText(text);
+        tg.MainButton.onClick(onClick);
+        tg.MainButton.show();
+      } catch (e) {
+        console.warn('Failed to show main button:', e);
+      }
     }
   }, [tg]);
 
   const hideMainButton = useCallback(() => {
     if (tg?.MainButton) {
-      tg.MainButton.hide();
+      try {
+        tg.MainButton.hide();
+      } catch (e) {
+        console.warn('Failed to hide main button:', e);
+      }
+    }
+  }, [tg]);
+
+  const closeMiniApp = useCallback(() => {
+    if (tg) {
+      try {
+        tg.close();
+      } catch (e) {
+        console.warn('Failed to close mini app:', e);
+      }
     }
   }, [tg]);
 
@@ -146,15 +222,19 @@ export function useTelegram() {
     tg,
     isAvailable,
     isLoading,
+    initError,
     userId,
     username,
     firstName,
     lastName,
     initData,
+    hasValidInitData,
     colorScheme,
+    platformInfo,
     sendData,
     hapticFeedback,
     showMainButton,
     hideMainButton,
+    closeMiniApp,
   };
 }

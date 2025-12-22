@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PricingCard, PricingPlan } from '@/components/pricing/PricingCard';
+import { Card, CardContent } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTelegram } from '@/hooks/useTelegram';
+import { useAuth } from '@/contexts/AuthContext';
+import { MessageCircle, AlertTriangle } from 'lucide-react';
 
 const plans: PricingPlan[] = [
   {
@@ -78,20 +82,35 @@ const plans: PricingPlan[] = [
 ];
 
 const PricingPage = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const { userId, isAvailable } = useTelegram();
+  const { userId, isAvailable, hapticFeedback } = useTelegram();
+  const { isAuthenticated } = useAuth();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const pendingRequest = useRef(false);
 
   const handleSelectPlan = async (planId: string) => {
+    // Handle free plan
     if (planId === 'free') {
+      if (!isAuthenticated) {
+        navigate('/auth');
+        return;
+      }
       toast({
         title: 'Free Trial',
         description: 'Your free video credit is already available in your account!',
       });
+      navigate('/upload');
       return;
     }
 
-    if (!isAvailable || !userId) {
+    // Prevent double-clicks
+    if (pendingRequest.current || loadingPlan) {
+      return;
+    }
+
+    // Must be in Telegram
+    if (!isAvailable) {
       toast({
         variant: 'destructive',
         title: 'Telegram Required',
@@ -100,25 +119,42 @@ const PricingPage = () => {
       return;
     }
 
+    // Must have userId
+    if (!userId) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Unable to identify your Telegram account. Please reopen the app.',
+      });
+      return;
+    }
+
+    pendingRequest.current = true;
     setLoadingPlan(planId);
+    hapticFeedback('light');
     
     try {
       const response = await api.requestTelegramInvoice(planId, userId);
       
       if (response.success) {
+        hapticFeedback('success');
         toast({
           title: 'Invoice Sent!',
           description: 'Check your Telegram chat with @SmartDubBot to complete payment.',
         });
+      } else {
+        throw new Error(response.message || 'Failed to create invoice');
       }
     } catch (err) {
+      hapticFeedback('error');
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to create invoice. Please try again.',
+        description: err instanceof Error ? err.message : 'Failed to create invoice. Please try again.',
       });
     } finally {
       setLoadingPlan(null);
+      pendingRequest.current = false;
     }
   };
 
@@ -139,6 +175,18 @@ const PricingPage = () => {
             </p>
           </div>
 
+          {/* Telegram Payment Notice */}
+          {!isAvailable && (
+            <Card variant="glass" className="mb-8 border-secondary/50 max-w-2xl mx-auto">
+              <CardContent className="p-4 flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-secondary flex-shrink-0" />
+                <p className="text-sm text-foreground">
+                  To purchase credits, please open this app from Telegram.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Pricing Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-4">
             {plans.map((plan) => (
@@ -147,16 +195,21 @@ const PricingPage = () => {
                 plan={plan}
                 onSelect={handleSelectPlan}
                 isLoading={loadingPlan === plan.id}
+                isDisabled={loadingPlan !== null && loadingPlan !== plan.id}
               />
             ))}
           </div>
 
           {/* Payment Info */}
-          <div className="mt-16 text-center">
-            <p className="text-muted-foreground">
-              All payments are processed securely via Telegram Payments.
-              <br />
-              After clicking "Buy", you'll receive an invoice in Telegram.
+          <div className="mt-16 text-center space-y-2">
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <MessageCircle className="w-4 h-4" />
+              <p className="text-sm">
+                All payments are processed securely via Telegram Payments.
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              After clicking "Buy", you'll receive an invoice in your Telegram chat.
             </p>
           </div>
         </div>

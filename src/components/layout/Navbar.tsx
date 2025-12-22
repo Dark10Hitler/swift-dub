@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Menu, X, Zap, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTelegram } from '@/hooks/useTelegram';
-import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -16,9 +16,9 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const { isAvailable, firstName, username } = useTelegram();
-  const isAuthenticated = api.isAuthenticated();
+  const { isAuthenticated, user } = useAuth();
 
-  const displayName = firstName || username || 'User';
+  const displayName = user?.first_name || firstName || username || 'User';
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass">

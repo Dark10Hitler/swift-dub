@@ -1,23 +1,23 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { VideoUploader } from '@/components/upload/VideoUploader';
 import { LanguageSelector } from '@/components/upload/LanguageSelector';
 import { ProcessingStatus } from '@/components/processing/ProcessingStatus';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { api, UserLimits, VideoTask } from '@/lib/api';
+import { api, UserLimits } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTelegram } from '@/hooks/useTelegram';
+import { useAuth } from '@/contexts/AuthContext';
 import { ArrowLeft, Video, Zap } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 type UploadState = 'select' | 'uploading' | 'processing' | 'completed' | 'failed';
 
 const UploadPage = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
-  const { userId, isAvailable, sendData } = useTelegram();
+  const { userId, isAvailable, sendData, hapticFeedback } = useTelegram();
+  const { user, refreshUser } = useAuth();
 
   const [state, setState] = useState<UploadState>('select');
   const [language, setLanguage] = useState('es');
@@ -53,14 +53,19 @@ const UploadPage = () => {
           setProcessingProgress(100);
           setDownloadUrl(task.download_url || null);
           setState('completed');
+          hapticFeedback('success');
           
           // Send to Telegram if available
           if (isAvailable && task.download_url) {
             sendData({ file_url: task.download_url });
           }
+          
+          // Refresh user limits
+          refreshUser();
         } else if (task.status === 'failed') {
           setError(task.error || 'Processing failed');
           setState('failed');
+          hapticFeedback('error');
         }
       } catch (err) {
         console.error('Failed to poll status');
@@ -69,7 +74,7 @@ const UploadPage = () => {
 
     const interval = setInterval(pollStatus, 3000);
     return () => clearInterval(interval);
-  }, [taskId, state, isAvailable, sendData]);
+  }, [taskId, state, isAvailable, sendData, hapticFeedback, refreshUser]);
 
   const hasCredits = limits && (limits.video_limit > 0 || !limits.free_used);
 
@@ -77,6 +82,7 @@ const UploadPage = () => {
     setState('uploading');
     setUploadProgress(0);
     setError(null);
+    hapticFeedback('light');
 
     try {
       const response = await api.uploadVideo(
@@ -99,6 +105,7 @@ const UploadPage = () => {
       const message = err instanceof Error ? err.message : 'Upload failed';
       setError(message);
       setState('failed');
+      hapticFeedback('error');
       
       toast({
         variant: 'destructive',

@@ -1,28 +1,33 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Navbar } from '@/components/layout/Navbar';
 import { TelegramAuth } from '@/components/auth/TelegramAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { api } from '@/lib/api';
 import { Zap } from 'lucide-react';
 
 const AuthPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  const { isAuthenticated, isInitialized } = useAuth();
+
+  // Get the redirect destination
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (api.isAuthenticated()) {
-      navigate('/dashboard');
+    if (isInitialized && isAuthenticated) {
+      navigate(from, { replace: true });
     }
-  }, [navigate]);
+  }, [isAuthenticated, isInitialized, navigate, from]);
 
   const handleSuccess = () => {
     toast({
       title: 'Welcome to SmartDub!',
       description: 'You have been successfully authenticated via Telegram.',
     });
-    navigate('/dashboard');
+    navigate(from, { replace: true });
   };
 
   const handleError = (error: string) => {

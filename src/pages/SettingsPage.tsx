@@ -19,17 +19,20 @@ import {
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTelegram } from '@/hooks/useTelegram';
-import { User, LogOut, Trash2, Shield, Bell } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { User, LogOut, Trash2, Shield } from 'lucide-react';
 
 const SettingsPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { userId, username, firstName, lastName } = useTelegram();
+  const { userId, username, firstName, lastName, hapticFeedback } = useTelegram();
+  const { logout, user } = useAuth();
   
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleLogout = () => {
-    api.logout();
+    hapticFeedback('light');
+    logout();
     toast({
       title: 'Logged out',
       description: 'You have been successfully logged out.',
@@ -39,14 +42,19 @@ const SettingsPage = () => {
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
+    hapticFeedback('warning');
+    
     try {
       await api.deleteAccount();
+      logout();
+      hapticFeedback('success');
       toast({
         title: 'Account deleted',
         description: 'Your account has been permanently deleted.',
       });
       navigate('/');
     } catch (err) {
+      hapticFeedback('error');
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -56,6 +64,12 @@ const SettingsPage = () => {
       setIsDeleting(false);
     }
   };
+
+  // Use user data from auth context, fallback to Telegram data
+  const displayUserId = user?.tg_id || userId;
+  const displayUsername = user?.username || username;
+  const displayFirstName = user?.first_name || firstName;
+  const displayLastName = user?.last_name || lastName;
 
   return (
     <div className="min-h-screen bg-background">
@@ -83,30 +97,30 @@ const SettingsPage = () => {
                   </div>
                   <div>
                     <CardTitle className="text-lg">Profile</CardTitle>
-                    <CardDescription>Your account information</CardDescription>
+                    <CardDescription>Your Telegram account information</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {userId && (
+                {displayUserId && (
                   <div className="space-y-2">
                     <Label>Telegram ID</Label>
-                    <Input value={userId.toString()} disabled />
+                    <Input value={displayUserId.toString()} disabled />
                   </div>
                 )}
-                {username && (
+                {displayUsername && (
                   <div className="space-y-2">
                     <Label>Username</Label>
-                    <Input value={`@${username}`} disabled />
+                    <Input value={`@${displayUsername}`} disabled />
                   </div>
                 )}
-                {(firstName || lastName) && (
+                {(displayFirstName || displayLastName) && (
                   <div className="space-y-2">
                     <Label>Name</Label>
-                    <Input value={`${firstName || ''} ${lastName || ''}`.trim()} disabled />
+                    <Input value={`${displayFirstName || ''} ${displayLastName || ''}`.trim()} disabled />
                   </div>
                 )}
-                {!userId && (
+                {!displayUserId && (
                   <p className="text-sm text-muted-foreground">
                     Connect via Telegram to see your profile information.
                   </p>

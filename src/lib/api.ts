@@ -7,8 +7,10 @@ export interface AuthResponse {
 
 export interface User {
   id: string;
-  email?: string;
-  tg_id?: number;
+  tg_id: number;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
   video_limit: number;
   free_used: boolean;
   created_at: string;
@@ -31,6 +33,11 @@ export interface VideoTask {
 export interface UploadResponse {
   task_id: string;
   status: string;
+}
+
+export interface TelegramInvoiceResponse {
+  success: boolean;
+  message: string;
 }
 
 class ApiClient {
@@ -77,31 +84,14 @@ class ApiClient {
     return response.json();
   }
 
-  // Auth endpoints
-  async login(email: string, password: string): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/auth/login', {
+  // Telegram Auth - validates initData and returns JWT
+  async authenticateWithTelegram(initData: string): Promise<AuthResponse> {
+    const response = await this.request<AuthResponse>('/auth/telegram', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ init_data: initData }),
     });
     this.setToken(response.token);
     return response;
-  }
-
-  async register(email: string, password: string): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-    this.setToken(response.token);
-    return response;
-  }
-
-  async generateCode(): Promise<{ code: string }> {
-    return this.request('/generate-code', { method: 'GET' });
-  }
-
-  async checkCodeStatus(code: string): Promise<{ authorized: boolean; token?: string }> {
-    return this.request(`/status?code=${code}`, { method: 'GET' });
   }
 
   // User endpoints
@@ -177,11 +167,14 @@ class ApiClient {
     return this.request('/videos/history');
   }
 
-  // Payment endpoints
-  async createPayment(planId: string): Promise<{ payment_url: string }> {
-    return this.request('/payments/create', {
+  // Telegram Bot Payment - sends invoice to user via Telegram Bot
+  async requestTelegramInvoice(planId: string, telegramUserId: number): Promise<TelegramInvoiceResponse> {
+    return this.request('/payments/telegram-invoice', {
       method: 'POST',
-      body: JSON.stringify({ plan_id: planId }),
+      body: JSON.stringify({ 
+        plan_id: planId,
+        telegram_user_id: telegramUserId 
+      }),
     });
   }
 

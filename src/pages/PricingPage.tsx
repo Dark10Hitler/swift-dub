@@ -4,6 +4,7 @@ import { Footer } from '@/components/layout/Footer';
 import { PricingCard, PricingPlan } from '@/components/pricing/PricingCard';
 import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { useTelegram } from '@/hooks/useTelegram';
 
 const plans: PricingPlan[] = [
   {
@@ -33,7 +34,7 @@ const plans: PricingPlan[] = [
       'All 50+ languages',
       'Priority processing',
       'Download in HD',
-      'Email support',
+      'Telegram support',
     ],
     badge: 'Popular',
   },
@@ -78,13 +79,23 @@ const plans: PricingPlan[] = [
 
 const PricingPage = () => {
   const { toast } = useToast();
+  const { userId, isAvailable } = useTelegram();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
   const handleSelectPlan = async (planId: string) => {
     if (planId === 'free') {
       toast({
         title: 'Free Trial',
-        description: 'Sign up to get your free video credit!',
+        description: 'Your free video credit is already available in your account!',
+      });
+      return;
+    }
+
+    if (!isAvailable || !userId) {
+      toast({
+        variant: 'destructive',
+        title: 'Telegram Required',
+        description: 'Please open this app from Telegram to make purchases.',
       });
       return;
     }
@@ -92,13 +103,19 @@ const PricingPage = () => {
     setLoadingPlan(planId);
     
     try {
-      const { payment_url } = await api.createPayment(planId);
-      window.location.href = payment_url;
+      const response = await api.requestTelegramInvoice(planId, userId);
+      
+      if (response.success) {
+        toast({
+          title: 'Invoice Sent!',
+          description: 'Check your Telegram chat with @SmartDubBot to complete payment.',
+        });
+      }
     } catch (err) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to start payment. Please try again.',
+        description: 'Failed to create invoice. Please try again.',
       });
     } finally {
       setLoadingPlan(null);
@@ -118,7 +135,7 @@ const PricingPage = () => {
               <span className="text-gradient">Pricing</span>
             </h1>
             <p className="text-lg text-muted-foreground">
-              Choose the plan that works for you. All plans include full access to our AI dubbing technology.
+              Choose the plan that works for you. Pay securely via Telegram.
             </p>
           </div>
 
@@ -134,12 +151,12 @@ const PricingPage = () => {
             ))}
           </div>
 
-          {/* FAQ/Trust */}
+          {/* Payment Info */}
           <div className="mt-16 text-center">
             <p className="text-muted-foreground">
-              All payments are secure and processed via our payment partner.
+              All payments are processed securely via Telegram Payments.
               <br />
-              Questions? <a href="/contact" className="text-primary hover:underline">Contact us</a>
+              After clicking "Buy", you'll receive an invoice in Telegram.
             </p>
           </div>
         </div>

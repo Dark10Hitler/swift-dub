@@ -107,13 +107,9 @@ const SettingsPage = () => {
                   </div>
                 )}
                 {!userId && (
-                  <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input value="user@example.com" disabled />
-                    <p className="text-xs text-muted-foreground">
-                      Email cannot be changed at this time.
-                    </p>
-                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Connect via Telegram to see your profile information.
+                  </p>
                 )}
               </CardContent>
             </Card>

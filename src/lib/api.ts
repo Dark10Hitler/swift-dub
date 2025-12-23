@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'https://api.smartdub.io';
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'https://backand-f86g.onrender.com';
 
 export interface AuthResponse {
   token: string;

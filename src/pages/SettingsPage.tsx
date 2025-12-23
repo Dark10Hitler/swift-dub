@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { api } from '@/lib/api';
+import { getStoredCode } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTelegram } from '@/hooks/useTelegram';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,7 +26,7 @@ const SettingsPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { userId, username, firstName, lastName, hapticFeedback } = useTelegram();
-  const { logout, user } = useAuth();
+  const { logout, minutesLeft, userCode } = useAuth();
   
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -45,12 +45,12 @@ const SettingsPage = () => {
     hapticFeedback('warning');
     
     try {
-      await api.deleteAccount();
+      // For now, just logout since delete endpoint may not exist
       logout();
       hapticFeedback('success');
       toast({
-        title: 'Account deleted',
-        description: 'Your account has been permanently deleted.',
+        title: 'Account cleared',
+        description: 'Your local data has been cleared.',
       });
       navigate('/');
     } catch (err) {
@@ -65,11 +65,7 @@ const SettingsPage = () => {
     }
   };
 
-  // Use user data from auth context, fallback to Telegram data
-  const displayUserId = user?.tg_id || userId;
-  const displayUsername = user?.username || username;
-  const displayFirstName = user?.first_name || firstName;
-  const displayLastName = user?.last_name || lastName;
+  const storedCode = userCode || getStoredCode();
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,25 +98,37 @@ const SettingsPage = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {displayUserId && (
+                {userId && (
                   <div className="space-y-2">
                     <Label>Telegram ID</Label>
-                    <Input value={displayUserId.toString()} disabled />
+                    <Input value={userId.toString()} disabled />
                   </div>
                 )}
-                {displayUsername && (
+                {username && (
                   <div className="space-y-2">
                     <Label>Username</Label>
-                    <Input value={`@${displayUsername}`} disabled />
+                    <Input value={`@${username}`} disabled />
                   </div>
                 )}
-                {(displayFirstName || displayLastName) && (
+                {(firstName || lastName) && (
                   <div className="space-y-2">
                     <Label>Name</Label>
-                    <Input value={`${displayFirstName || ''} ${displayLastName || ''}`.trim()} disabled />
+                    <Input value={`${firstName || ''} ${lastName || ''}`.trim()} disabled />
                   </div>
                 )}
-                {!displayUserId && (
+                {storedCode && (
+                  <div className="space-y-2">
+                    <Label>User Code</Label>
+                    <Input value={storedCode} disabled />
+                  </div>
+                )}
+                {minutesLeft > 0 && (
+                  <div className="space-y-2">
+                    <Label>Minutes Left</Label>
+                    <Input value={`${minutesLeft} minutes`} disabled />
+                  </div>
+                )}
+                {!userId && (
                   <p className="text-sm text-muted-foreground">
                     Connect via Telegram to see your profile information.
                   </p>

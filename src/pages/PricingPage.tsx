@@ -4,7 +4,6 @@ import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { PricingCard, PricingPlan } from '@/components/pricing/PricingCard';
 import { Card, CardContent } from '@/components/ui/card';
-import { api } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTelegram } from '@/hooks/useTelegram';
 import { useAuth } from '@/contexts/AuthContext';
@@ -134,23 +133,18 @@ const PricingPage = () => {
     hapticFeedback('light');
     
     try {
-      const response = await api.requestTelegramInvoice(planId, userId);
-      
-      if (response.success) {
-        hapticFeedback('success');
-        toast({
-          title: 'Invoice Sent!',
-          description: 'Check your Telegram chat with @SmartDubBot to complete payment.',
-        });
-      } else {
-        throw new Error(response.message || 'Failed to create invoice');
-      }
+      // Payment will be handled via Telegram bot
+      hapticFeedback('success');
+      toast({
+        title: 'Coming Soon',
+        description: 'Payment integration will be available soon.',
+      });
     } catch (err) {
       hapticFeedback('error');
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to create invoice. Please try again.',
+        description: err instanceof Error ? err.message : 'Failed to process request.',
       });
     } finally {
       setLoadingPlan(null);

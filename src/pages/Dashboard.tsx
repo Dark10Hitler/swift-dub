@@ -5,32 +5,42 @@ import { StatsCard } from '@/components/dashboard/StatsCard';
 import { VideoHistoryTable } from '@/components/dashboard/VideoHistoryTable';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { api, UserLimits, VideoTask } from '@/lib/api';
+import { checkStatus, getStoredCode, TaskStatusResponse } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTelegram } from '@/hooks/useTelegram';
 import { useAuth } from '@/contexts/AuthContext';
 import { Upload, CreditCard, Video, Zap, Gift, AlertTriangle } from 'lucide-react';
 
+interface DashboardLimits {
+  minutes_left: number;
+  is_active: boolean;
+}
+
 const Dashboard = () => {
   const { toast } = useToast();
-  const { isAvailable, userId } = useTelegram();
-  const { user } = useAuth();
+  const { isAvailable, userId, firstName } = useTelegram();
+  const { minutesLeft } = useAuth();
   
-  const [limits, setLimits] = useState<UserLimits | null>(null);
-  const [videos, setVideos] = useState<VideoTask[]>([]);
+  const [limits, setLimits] = useState<DashboardLimits | null>(null);
+  const [videos, setVideos] = useState<TaskStatusResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const displayName = user?.first_name || 'there';
+  const displayName = firstName || 'there';
 
   useEffect(() => {
     const fetchData = async () => {
+      const code = getStoredCode();
+      if (!code) {
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        const [limitsData, videosData] = await Promise.all([
-          api.getUserLimits(),
-          api.getVideoHistory(),
-        ]);
-        setLimits(limitsData);
-        setVideos(videosData);
+        const statusData = await checkStatus(code);
+        setLimits({
+          minutes_left: statusData.minutes_left,
+          is_active: statusData.is_active,
+        });
       } catch (err) {
         toast({
           variant: 'destructive',
@@ -45,7 +55,7 @@ const Dashboard = () => {
     fetchData();
   }, [toast]);
 
-  const hasCredits = limits && (limits.video_limit > 0 || !limits.free_used);
+  const hasCredits = limits && limits.minutes_left > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -78,21 +88,21 @@ const Dashboard = () => {
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <StatsCard
-              title="Video Credits"
-              value={limits?.video_limit ?? 0}
-              subtitle="Remaining videos"
+              title="Minutes Left"
+              value={limits?.minutes_left ?? minutesLeft ?? 0}
+              subtitle="Remaining time"
               icon={Video}
               variant="primary"
             />
             <StatsCard
-              title="Free Trial"
-              value={limits?.free_used ? 'Used' : 'Available'}
-              subtitle={limits?.free_used ? 'Upgrade for more' : '1 free video'}
+              title="Account Status"
+              value={limits?.is_active ? 'Active' : 'Inactive'}
+              subtitle={limits?.is_active ? 'Ready to use' : 'Get credits to start'}
               icon={Gift}
             />
             <StatsCard
               title="Videos Processed"
-              value={limits?.videos_processed ?? 0}
+              value={videos.length}
               subtitle="Total processed"
               icon={Zap}
             />
@@ -179,8 +189,8 @@ const Dashboard = () => {
           {/* Video History */}
           <VideoHistoryTable 
             videos={videos.map((v) => ({
-              id: v.id,
-              name: `Video ${v.id.slice(0, 8)}`,
+              id: v.task_id,
+              name: `Video ${v.task_id.slice(0, 8)}`,
               status: v.status,
               language: 'en',
               createdAt: new Date().toISOString(),

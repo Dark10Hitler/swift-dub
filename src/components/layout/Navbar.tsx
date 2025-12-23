@@ -16,9 +16,9 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
   const { isAvailable, firstName, username } = useTelegram();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
-  const displayName = user?.first_name || firstName || username || 'User';
+  const displayName = firstName || username || 'User';
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass">

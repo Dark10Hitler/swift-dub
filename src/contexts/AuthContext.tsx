@@ -1,16 +1,25 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { api, User } from '@/lib/api';
+import { 
+  generateCode, 
+  connectTelegram, 
+  checkStatus, 
+  getStoredCode, 
+  saveCode, 
+  clearCode,
+  StatusResponse 
+} from '@/lib/api';
 import { useTelegram } from '@/hooks/useTelegram';
 
 interface AuthContextType {
-  user: User | null;
+  userCode: string | null;
+  minutesLeft: number;
   isAuthenticated: boolean;
   isLoading: boolean;
   isInitialized: boolean;
   error: string | null;
-  login: () => Promise<boolean>;
+  connect: () => Promise<boolean>;
   logout: () => void;
-  refreshUser: () => Promise<void>;
+  refreshStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -22,40 +31,44 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const { isAvailable, isLoading: isTelegramLoading, initData, hasValidInitData } = useTelegram();
   
-  const [user, setUser] = useState<User | null>(null);
+  const [userCode, setUserCode] = useState<string | null>(null);
+  const [minutesLeft, setMinutesLeft] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isAuthenticated = Boolean(user && api.isAuthenticated());
+  const isAuthenticated = Boolean(userCode && minutesLeft >= 0);
 
   // Centralized logout logic
   const logout = useCallback(() => {
-    api.logout();
-    setUser(null);
+    clearCode();
+    setUserCode(null);
+    setMinutesLeft(0);
     setError(null);
   }, []);
 
-  // Refresh user data from API
-  const refreshUser = useCallback(async () => {
-    if (!api.isAuthenticated()) {
-      setUser(null);
+  // Refresh status from API
+  const refreshStatus = useCallback(async () => {
+    const code = getStoredCode();
+    if (!code) {
+      setUserCode(null);
+      setMinutesLeft(0);
       return;
     }
 
     try {
-      const userData = await api.getUser();
-      setUser(userData);
+      const status = await checkStatus(code);
+      setUserCode(code);
+      setMinutesLeft(status.minutes_left);
       setError(null);
     } catch (err) {
-      // Token is invalid or expired
-      console.warn('Failed to refresh user, logging out');
-      logout();
+      console.warn('Failed to refresh status');
+      // Don't logout on status check failure, just log
     }
-  }, [logout]);
+  }, []);
 
-  // Login with Telegram initData
-  const login = useCallback(async (): Promise<boolean> => {
+  // Connect with Telegram initData
+  const connect = useCallback(async (): Promise<boolean> => {
     if (!hasValidInitData || !initData) {
       setError('No valid Telegram data available');
       return false;
@@ -65,18 +78,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
 
     try {
-      const response = await api.authenticateWithTelegram(initData);
-      setUser(response.user);
-      return true;
+      // Get or generate user code
+      let code = getStoredCode();
+      
+      if (!code) {
+        const codeResponse = await generateCode();
+        code = codeResponse.code;
+        saveCode(code);
+      }
+
+      // Connect with Telegram
+      const response = await connectTelegram(code, initData);
+      
+      if (response.success) {
+        setUserCode(code);
+        setMinutesLeft(response.minutes_left);
+        return true;
+      } else {
+        throw new Error(response.message || 'Connection failed');
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Authentication failed';
+      const message = err instanceof Error ? err.message : 'Connection failed';
       setError(message);
-      logout();
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [initData, hasValidInitData, logout]);
+  }, [initData, hasValidInitData]);
 
   // Initialize auth state on app load
   useEffect(() => {
@@ -84,14 +112,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Wait for Telegram SDK to initialize
       if (isTelegramLoading) return;
 
-      // Check if we have an existing token
-      if (api.isAuthenticated()) {
+      // Check if we have an existing code
+      const code = getStoredCode();
+      if (code) {
         try {
-          const userData = await api.getUser();
-          setUser(userData);
+          const status = await checkStatus(code);
+          setUserCode(code);
+          setMinutesLeft(status.minutes_left);
         } catch {
-          // Token is invalid, clear it
-          logout();
+          // Code is invalid, clear it
+          clearCode();
         }
       }
 
@@ -100,17 +130,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     initAuth();
-  }, [isTelegramLoading, logout]);
+  }, [isTelegramLoading]);
 
   const value: AuthContextType = {
-    user,
+    userCode,
+    minutesLeft,
     isAuthenticated,
     isLoading: isLoading || isTelegramLoading,
     isInitialized,
     error,
-    login,
+    connect,
     logout,
-    refreshUser,
+    refreshStatus,
   };
 
   return (

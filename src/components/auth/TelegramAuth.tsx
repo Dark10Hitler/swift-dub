@@ -12,7 +12,7 @@ interface TelegramAuthProps {
 
 export function TelegramAuth({ onSuccess, onError }: TelegramAuthProps) {
   const { isAvailable, isLoading: isTelegramLoading, hasValidInitData, firstName, username } = useTelegram();
-  const { login, isAuthenticated, error: authError } = useAuth();
+  const { connect, isAuthenticated, error: authError } = useAuth();
   
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authAttempted, setAuthAttempted] = useState(false);
@@ -35,7 +35,7 @@ export function TelegramAuth({ onSuccess, onError }: TelegramAuthProps) {
       setAuthAttempted(true);
 
       try {
-        const success = await login();
+        const success = await connect();
         if (success) {
           onSuccess();
         } else if (authError) {
@@ -51,7 +51,7 @@ export function TelegramAuth({ onSuccess, onError }: TelegramAuthProps) {
     };
 
     authenticate();
-  }, [isAvailable, hasValidInitData, isTelegramLoading, isAuthenticated, authAttempted, login, onSuccess, onError, authError, isAuthenticating]);
+  }, [isAvailable, hasValidInitData, isTelegramLoading, isAuthenticated, authAttempted, connect, onSuccess, onError, authError, isAuthenticating]);
 
   // Report auth errors
   useEffect(() => {

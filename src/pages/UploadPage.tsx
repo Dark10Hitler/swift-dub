@@ -6,7 +6,7 @@ import { LanguageSelector } from '@/components/upload/LanguageSelector';
 import { ProcessingStatus } from '@/components/processing/ProcessingStatus';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { api, UserLimits } from '@/lib/api';
+import { translateVideo, getTaskStatus, checkStatus, getStoredCode, StatusResponse } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useTelegram } from '@/hooks/useTelegram';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +17,7 @@ type UploadState = 'select' | 'uploading' | 'processing' | 'completed' | 'failed
 const UploadPage = () => {
   const { toast } = useToast();
   const { userId, isAvailable, sendData, hapticFeedback } = useTelegram();
-  const { user, refreshUser } = useAuth();
+  const { refreshStatus, minutesLeft } = useAuth();
 
   const [state, setState] = useState<UploadState>('select');
   const [language, setLanguage] = useState('es');
@@ -26,12 +26,15 @@ const UploadPage = () => {
   const [taskId, setTaskId] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [limits, setLimits] = useState<UserLimits | null>(null);
+  const [limits, setLimits] = useState<StatusResponse | null>(null);
 
   useEffect(() => {
     const fetchLimits = async () => {
+      const code = getStoredCode();
+      if (!code) return;
+      
       try {
-        const data = await api.getUserLimits();
+        const data = await checkStatus(code);
         setLimits(data);
       } catch (err) {
         console.error('Failed to fetch limits');
@@ -45,10 +48,10 @@ const UploadPage = () => {
 
     const pollStatus = async () => {
       try {
-        const task = await api.getTaskStatus(taskId);
+        const task = await getTaskStatus(taskId);
         
         if (task.status === 'processing') {
-          setProcessingProgress(task.progress);
+          setProcessingProgress(task.progress || 0);
         } else if (task.status === 'completed') {
           setProcessingProgress(100);
           setDownloadUrl(task.download_url || null);
@@ -61,7 +64,7 @@ const UploadPage = () => {
           }
           
           // Refresh user limits
-          refreshUser();
+          refreshStatus();
         } else if (task.status === 'failed') {
           setError(task.error || 'Processing failed');
           setState('failed');
@@ -74,22 +77,31 @@ const UploadPage = () => {
 
     const interval = setInterval(pollStatus, 3000);
     return () => clearInterval(interval);
-  }, [taskId, state, isAvailable, sendData, hapticFeedback, refreshUser]);
+  }, [taskId, state, isAvailable, sendData, hapticFeedback, refreshStatus]);
 
-  const hasCredits = limits && (limits.video_limit > 0 || !limits.free_used);
+  const hasCredits = limits && limits.minutes_left > 0;
 
   const handleUpload = async (file: File) => {
+    const code = getStoredCode();
+    if (!code) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Please connect your account first.',
+      });
+      return;
+    }
+
     setState('uploading');
     setUploadProgress(0);
     setError(null);
     hapticFeedback('light');
 
     try {
-      const response = await api.uploadVideo(
+      const response = await translateVideo(
         file,
+        code,
         language,
-        userId || undefined,
-        undefined,
         setUploadProgress
       );
 
@@ -163,10 +175,10 @@ const UploadPage = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-foreground">
-                    {limits?.video_limit ?? 0} credits remaining
+                    {limits?.minutes_left ?? minutesLeft ?? 0} minutes remaining
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {!limits?.free_used && 'Free trial available'}
+                    {limits?.is_active ? 'Account active' : 'Get credits to start'}
                   </p>
                 </div>
               </div>
